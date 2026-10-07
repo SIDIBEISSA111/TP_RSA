@@ -13,8 +13,8 @@ export function Nav() {
   const path = usePathname();
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-void/80 backdrop-blur-md">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 text-sm font-bold tracking-widest">
+      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
+        <Link href="/" className="flex shrink-0 items-center gap-2 text-xs font-bold tracking-widest sm:text-sm">
           <span className="grid size-7 place-items-center rounded border border-neon/50 text-neon glow">⌬</span>
           <span>
             CIPHER<span className="text-neon glow">{"//"}</span>LAB
@@ -27,11 +27,11 @@ export function Nav() {
               <Link
                 key={l.href}
                 href={l.href}
-                className={`rounded px-2.5 py-1.5 transition-colors sm:px-3 ${
+                className={`rounded px-2 py-1.5 transition-colors sm:px-3 ${
                   active ? "bg-neon/10 text-neon glow" : "text-mute hover:text-ink"
                 }`}
               >
-                <span className="text-neon-dim">./</span>
+                <span className="hidden text-neon-dim sm:inline">./</span>
                 {l.label.toLowerCase()}
               </Link>
             );
