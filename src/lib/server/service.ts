@@ -71,7 +71,7 @@ export async function register(d: Db, input: RegisterInput) {
   const authHash = await hashAuthKey(authKey, authSalt);
   const rows = await d.query<UserRow>(
     `INSERT INTO users (username, kdf_salt, auth_salt, auth_hash, public_key, fingerprint, enc_private_key)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
+     VALUES ($1, $2, $3, $4, $5::text::jsonb, $6, $7)
      ON CONFLICT (username) DO NOTHING
      RETURNING *`,
     [username, kdfSalt, authSalt, authHash, JSON.stringify({ n, e }), rsaFingerprint(n, e), input.encPrivateKey],
@@ -214,7 +214,7 @@ export async function sendMessage(d: Db, uid: number, toName: unknown, envRecipi
   if (count >= 30) throw new ApiError(429, "Trop de messages : attends une minute");
 
   const [row] = await d.query<{ id: number; created_at: Date }>(
-    `INSERT INTO messages (sender_id, recipient_id, env_recipient, env_sender) VALUES ($1, $2, $3::jsonb, $4::jsonb)
+    `INSERT INTO messages (sender_id, recipient_id, env_recipient, env_sender) VALUES ($1, $2, $3::text::jsonb, $4::text::jsonb)
      RETURNING id, created_at`,
     [uid, to.id, JSON.stringify(er), JSON.stringify(es)],
   );

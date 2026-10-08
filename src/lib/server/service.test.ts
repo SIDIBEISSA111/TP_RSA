@@ -1,9 +1,13 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { PGlite } from "@electric-sql/pglite";
+import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import { generateKeyPair } from "../crypto/rsa";
 import { fingerprint, getScheme, rsaPrivateRecord, rsaPublicRecord, type Envelope, type KeyRecord } from "../crypto/registry";
 import type { Db } from "./db";
 
-process.env.PGLITE_DIR = "memory://";
+// Les tests passent par le même pilote qu'en production (postgres.js), branché sur un PostgreSQL embarqué
+const PORT = 5433 + Math.floor(Math.random() * 1000);
+let server: PGLiteSocketServer;
 
 let d: Db;
 let svc: typeof import("./service");
@@ -38,10 +42,17 @@ let awa: TestUser;
 let moussa: TestUser;
 
 beforeAll(async () => {
+  server = new PGLiteSocketServer({ db: new PGlite("memory://"), port: PORT });
+  await server.start();
+  process.env.DATABASE_URL = `postgres://postgres@127.0.0.1:${PORT}/postgres`;
   d = await (await import("./db")).db();
   svc = await import("./service");
   awa = await makeUser("awa");
   moussa = await makeUser("moussa");
+});
+
+afterAll(async () => {
+  await server.stop();
 });
 
 describe("comptes", () => {
@@ -112,5 +123,24 @@ describe("messages chiffrés", () => {
     expect(await svc.conversations(d, eve.id)).toHaveLength(0);
     const leak = await svc.listMessages(d, eve.id, "awa", 0);
     expect(leak).toHaveLength(0);
+  });
+});
+
+describe("format JSON en base (régression)", () => {
+  it("la clé publique est stockée comme un objet JSON, pas comme une chaîne", async () => {
+    const [row] = await d.query<{ t: string }>(`SELECT jsonb_typeof(public_key) AS t FROM users WHERE username = 'awa'`);
+    expect(row.t).toBe("object");
+    const u = await svc.findUser(d, "awa");
+    expect(u.publicKey.n).toBe(awa.pub.n);
+    expect(await fingerprint("RSA", u.publicKey)).toBe(u.fingerprint);
+  });
+
+  it("le schéma répare les lignes doublement encodées des premières versions", async () => {
+    await d.query(`UPDATE users SET public_key = to_jsonb(public_key::text) WHERE username = 'moussa'`);
+    const [broken] = await d.query<{ t: string }>(`SELECT jsonb_typeof(public_key) AS t FROM users WHERE username = 'moussa'`);
+    expect(broken.t).toBe("string");
+    await d.exec((await import("./db")).SCHEMA);
+    const u = await svc.findUser(d, "moussa");
+    expect(await fingerprint("RSA", u.publicKey)).toBe(u.fingerprint);
   });
 });

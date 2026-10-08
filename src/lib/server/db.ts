@@ -7,7 +7,7 @@ export interface Db {
   exec(text: string): Promise<void>;
 }
 
-const SCHEMA = `
+export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
   id              SERIAL PRIMARY KEY,
   username        TEXT NOT NULL UNIQUE,
@@ -29,7 +29,13 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 CREATE INDEX IF NOT EXISTS messages_sender ON messages (sender_id, id);
 CREATE INDEX IF NOT EXISTS messages_recipient ON messages (recipient_id, id);
+-- Réparation : les premières versions stockaient le JSON doublement encodé (une chaîne au lieu d'un objet)
+UPDATE users SET public_key = (public_key #>> '{}')::jsonb WHERE jsonb_typeof(public_key) = 'string';
+UPDATE messages SET env_recipient = (env_recipient #>> '{}')::jsonb WHERE jsonb_typeof(env_recipient) = 'string';
+UPDATE messages SET env_sender = (env_sender #>> '{}')::jsonb WHERE jsonb_typeof(env_sender) = 'string';
 `;
+// Toujours insérer du JSON avec « $n::text::jsonb » : avec « $n::jsonb », le pilote postgres.js
+// ré-encode la chaîne déjà sérialisée et la base stocke une chaîne au lieu d'un objet.
 
 async function connect(): Promise<Db> {
   const url = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
