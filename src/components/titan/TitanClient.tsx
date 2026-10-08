@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Alert, Button, Label, Panel, downloadText, inputClass } from "@/components/ui";
+import { LucasLehmer, PrimeViewer, type Verified, type Which } from "./PrimeViewer";
+
+// Onglet actif dans l'URL (#nombres) : lien direct possible vers les nombres premiers
+const subscribeHash = (cb: () => void) => {
+  window.addEventListener("hashchange", cb);
+  return () => window.removeEventListener("hashchange", cb);
+};
+const useHash = () => useSyncExternalStore(subscribeHash, () => location.hash, () => "");
 
 interface Part {
   digits: number;
@@ -46,6 +54,11 @@ export function TitanClient() {
   const [benching, setBenching] = useState(false);
   const [attack, setAttack] = useState<{ ok: boolean; a: number; b: number; ms: number } | null>(null);
   const [error, setError] = useState("");
+  const [verified, setVerified] = useState<Partial<Record<Which, Verified>>>({});
+  const [verifying, setVerifying] = useState<Which | null>(null);
+  const [lucas, setLucas] = useState<{ k: number; prime: boolean; ms: number } | null>(null);
+  const [lucasRunning, setLucasRunning] = useState(false);
+  const tab = useHash() === "#nombres" ? "nombres" : "defi";
 
   useEffect(() => {
     const w = new Worker(new URL("../../workers/titan.worker.ts", import.meta.url), { type: "module" });
@@ -74,7 +87,17 @@ export function TitanClient() {
         case "hex":
           downloadText("titan-n.hex.txt", m.hex);
           break;
+        case "verified":
+          setVerified((prev) => ({ ...prev, [m.which]: m }));
+          setVerifying(null);
+          break;
+        case "lucas":
+          setLucas(m);
+          setLucasRunning(false);
+          break;
         case "error":
+          setVerifying(null);
+          setLucasRunning(false);
           setError(m.message);
           setBuilding(false);
           setBenching(false);
@@ -100,6 +123,52 @@ export function TitanClient() {
           de la forme 2ᵏ − 1. Ils se reconstruisent instantanément à partir de leur seul exposant.
         </p>
       </header>
+
+      <div className="grid grid-cols-2 gap-1.5" role="tablist">
+        {(
+          [
+            ["defi", "#", "⚡ Le défi"],
+            ["nombres", "#nombres", "🔢 Voir les nombres premiers"],
+          ] as const
+        ).map(([id, href, label]) => (
+          <a
+            key={id}
+            href={href}
+            role="tab"
+            aria-selected={tab === id}
+            className={`rounded-t border-b-2 px-3 py-2.5 text-xs transition sm:text-sm ${
+              tab === id ? "border-amber bg-amber/10 text-amber" : "border-line text-mute hover:text-ink"
+            }`}
+          >
+            {label}
+          </a>
+        ))}
+      </div>
+
+      <div hidden={tab !== "nombres"} className="space-y-6">
+        <Panel title="titan/nombres.txt">
+          <PrimeViewer
+            verified={verified}
+            verifying={verifying}
+            onVerify={(w) => {
+              setVerifying(w);
+              send({ type: "verify", which: w });
+            }}
+          />
+        </Panel>
+        <Panel title="titan/lucas-lehmer.sh">
+          <LucasLehmer
+            result={lucas}
+            running={lucasRunning}
+            onRun={(k) => {
+              setLucasRunning(true);
+              send({ type: "lucas", k });
+            }}
+          />
+        </Panel>
+      </div>
+
+      <div hidden={tab !== "defi"} className="space-y-6">
 
       {error && <Alert>{error}</Alert>}
 
@@ -262,6 +331,7 @@ export function TitanClient() {
           </div>
         )}
       </Panel>
+      </div>
     </div>
   );
 }

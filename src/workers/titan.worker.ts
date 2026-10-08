@@ -111,7 +111,41 @@ function attack() {
   post({ type: "attacked", ok, a, b, ms: performance.now() - t0 });
 }
 
-self.onmessage = (e: MessageEvent<{ type: string; text?: string }>) => {
+/** Recalcule l'écriture décimale d'un des nombres et son empreinte SHA-256, pour la comparer au fichier publié. */
+async function verify(which: string) {
+  if (N === 0n) build();
+  const value = which === "p" ? p : which === "q" ? q : N;
+  const t0 = performance.now();
+  const dec = value.toString(10);
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(dec)));
+  const sha256 = Array.from(digest, (b) => b.toString(16).padStart(2, "0")).join("");
+  post({ type: "verified", which, digits: dec.length, sha256, ms: performance.now() - t0 });
+}
+
+/** Test de Lucas-Lehmer : M = 2^k − 1 (k premier impair) est premier ⇔ s(k−2) ≡ 0 mod M, avec s0 = 4, s(i+1) = s(i)² − 2. */
+function lucasLehmer(k: number) {
+  const t0 = performance.now();
+  const K = BigInt(k);
+  const M = (1n << K) - 1n;
+  let s = 4n;
+  for (let i = 0; i < k - 2; i++) {
+    let y = s * s - 2n;
+    if (y < 0n) y += M;
+    s = (y & M) + (y >> K);
+    if (s >= M) s -= M;
+  }
+  post({ type: "lucas", k, prime: s === 0n || s === M, ms: performance.now() - t0 });
+}
+
+self.onmessage = (e: MessageEvent<{ type: string; text?: string; which?: string; k?: number }>) => {
+  if (e.data.type === "verify") {
+    verify(e.data.which ?? "p").catch((err) => post({ type: "error", message: (err as Error).message }));
+    return;
+  }
+  if (e.data.type === "lucas") {
+    lucasLehmer(e.data.k ?? 127);
+    return;
+  }
   try {
     if (e.data.type === "build") build();
     else if (e.data.type === "encrypt") encrypt(e.data.text ?? "");
