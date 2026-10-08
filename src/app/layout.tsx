@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Footer } from "@/components/Footer";
 import { Nav } from "@/components/Nav";
 import "./globals.css";
 
@@ -22,9 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <Nav />
         <main className="flex-1">{children}</main>
-        <footer className="border-t border-line px-4 py-5 text-center text-xs text-mute">
-          CIPHER//LAB · projet de cryptographie · tous les calculs s&apos;exécutent dans votre navigateur
-        </footer>
+        <Footer />
       </body>
     </html>
   );

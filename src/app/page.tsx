@@ -41,16 +41,22 @@ export default function Home() {
             </h1>
             <p className="mt-6 max-w-xl text-sm leading-relaxed text-mute sm:text-base">
               Le chiffrement <span className="text-ink">RSA</span> de bout en bout : de{" "}
-              <span className="text-neon">n = p × q</span> jusqu&apos;au message secret. Clés jusqu&apos;à 4096 bits, et le
-              défi <span className="text-amber">TITAN</span> : deux nombres premiers de plus d&apos;un million de
-              chiffres chacun.
+              <span className="text-neon">n = p × q</span> jusqu&apos;au message secret. Crée ton compte et discute en{" "}
+              <span className="text-ink">chat chiffré</span>, explore RSA dans le labo, et relève le défi{" "}
+              <span className="text-amber">TITAN</span> : deux nombres premiers de plus d&apos;un million de chiffres chacun.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                href="/lab"
+                href="/chat"
                 className="rounded border border-neon bg-neon/15 px-5 py-3 text-sm font-semibold tracking-wider text-neon uppercase shadow-[0_0_24px_-6px_var(--color-neon)] transition hover:bg-neon hover:text-void"
               >
-                ▶ Entrer dans le labo
+                ▶ Ouvrir le chat chiffré
+              </Link>
+              <Link
+                href="/lab"
+                className="rounded border border-line-strong px-5 py-3 text-sm font-semibold tracking-wider text-ink uppercase transition hover:border-neon hover:text-neon"
+              >
+                ⌬ Labo RSA
               </Link>
               <Link
                 href="/titan"
