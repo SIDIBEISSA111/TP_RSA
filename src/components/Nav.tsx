@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
-  { href: "/chat", label: "Chat" },
+  { href: "/chat", label: "Réseau" },
   { href: "/lab", label: "Labo" },
   { href: "/titan", label: "Titan" },
+  { href: "/premiers", label: "Premiers" },
   { href: "/learn", label: "Apprendre" },
 ];
 
@@ -17,7 +18,7 @@ export function Nav() {
       <nav className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-3">
         <Link href="/" className="flex shrink-0 items-center gap-2 text-xs font-bold tracking-widest sm:text-sm">
           <span className="grid size-7 place-items-center rounded border border-neon/50 text-neon glow">⌬</span>
-          <span>
+          <span className="hidden sm:inline">
             CIPHER<span className="text-neon glow">{"//"}</span>LAB
           </span>
         </Link>
@@ -28,7 +29,7 @@ export function Nav() {
               <Link
                 key={l.href}
                 href={l.href}
-                className={`rounded px-2 py-1.5 transition-colors sm:px-3 ${
+                className={`rounded px-1.5 py-1.5 transition-colors sm:px-3 ${
                   active ? "bg-neon/10 text-neon glow" : "text-mute hover:text-ink"
                 }`}
               >

@@ -31,7 +31,7 @@ async function unlock(me: MeResponse, password: string, log: Log): Promise<Accou
   return account;
 }
 
-export function AuthScreen({ onReady }: { onReady: (a: Account) => void }) {
+export function AuthScreen({ onReady }: { onReady: (a: Account, fresh?: boolean) => void }) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -55,7 +55,8 @@ export function AuthScreen({ onReady }: { onReady: (a: Account) => void }) {
         if (!understood) throw new Error("Coche la case pour confirmer que tu as compris l'avertissement");
       }
       setBusy(true);
-      onReady(mode === "register" ? await register(u) : await login(u));
+      if (mode === "register") onReady(await register(u), true);
+      else onReady(await login(u));
     } catch (err) {
       setError((err as Error).message);
       log(`[!] ${(err as Error).message}`);
@@ -78,6 +79,7 @@ export function AuthScreen({ onReady }: { onReady: (a: Account) => void }) {
     log("[*] Envoi au serveur : pseudo, clé publique, clé privée CHIFFRÉE…");
     await api("/api/auth/register", { username: u, kdfSalt, authKey, publicKey, encPrivateKey });
     log(`[+] Compte créé — empreinte ${fp}`);
+    log("[+] Clé publique publiée sur le réseau : tout le monde la voit dans l'annuaire");
     const account: Account = { username: u, fingerprint: fp, publicKey, privateKey: priv };
     storeUnlocked(account);
     return account;
@@ -96,9 +98,9 @@ export function AuthScreen({ onReady }: { onReady: (a: Account) => void }) {
   return (
     <div className="mx-auto grid max-w-5xl gap-6 px-4 py-10 lg:grid-cols-[1fr_1fr]">
       <div className="rise space-y-4">
-        <p className="text-xs tracking-[0.3em] text-cyan glow-cyan">{"// CHAT CHIFFRÉ"}</p>
+        <p className="text-xs tracking-[0.3em] text-cyan glow-cyan">{"// RÉSEAU CHIFFRÉ"}</p>
         <h1 className="font-display text-4xl font-bold">
-          Messagerie <span className="text-neon glow">RSA</span> de bout en bout
+          Réseau de messages <span className="text-neon glow">RSA</span>
         </h1>
         <ul className="space-y-2 text-sm text-mute">
           <li>
@@ -109,8 +111,8 @@ export function AuthScreen({ onReady }: { onReady: (a: Account) => void }) {
             l&apos;ouvrir.
           </li>
           <li>
-            <span className="text-neon">▸</span> Chaque message est chiffré avec la clé publique du destinataire. Le serveur ne stocke que des blocs
-            illisibles.
+            <span className="text-neon">▸</span> Ta clé publique est publiée dans l&apos;annuaire du réseau. Chaque message est chiffré avec la clé publique de son
+            destinataire puis diffusé à <b className="text-ink">tous</b> : tout le monde le voit, seul le destinataire peut le déchiffrer.
           </li>
         </ul>
         <Terminal lines={lines} busy={busy} className="max-h-64" />

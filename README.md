@@ -5,7 +5,9 @@ En ligne : https://cipher-lab-tau.vercel.app
 
 ## Fonctionnalités
 
-- **Chat chiffré** (`/chat`) : création de compte (pseudo et mot de passe) et messagerie chiffrée de bout en bout en RSA-2048.
+- **Réseau chiffré** (`/chat`) : création de compte (pseudo et mot de passe) et réseau de messages chiffrés en RSA-2048.
+  - À l'inscription, la clé publique (n, e) est publiée dans l'**annuaire**, visible par tous.
+  - Un message est chiffré avec la clé publique du destinataire puis **diffusé à tout le réseau** : tous les utilisateurs le voient (onglet Réseau), chacun peut cliquer sur « Déchiffrer avec ma clé privée », mais seul le destinataire y parvient. Chaque étape (chiffrement, diffusion, déchiffrement) est affichée.
   - La paire de clés RSA est générée dans le navigateur.
   - Le mot de passe ne quitte jamais le navigateur. On en dérive deux clés avec PBKDF2-SHA256 (300 000 itérations) :
     - une clé d'authentification, envoyée au serveur, qui la hache ensuite avec scrypt ;
@@ -22,7 +24,7 @@ En ligne : https://cipher-lab-tau.vercel.app
   - n = p × q (6 152 906 chiffres), calculé en environ 0,2 s ;
   - chiffrement avec e = 65537 (environ 30 s), et estimation mesurée du temps de déchiffrement ;
   - attaque qui factorise n parce que p et q sont publics ;
-  - onglet **Voir les nombres premiers** (`/titan#nombres`) : tous les chiffres de p, q et n, page par page, avec téléchargement. Le navigateur peut recalculer chaque nombre et comparer son empreinte SHA-256 avec le fichier publié. Une démo du test de Lucas-Lehmer est incluse.
+  - page **Premiers** (`/premiers`, aussi dans l'onglet `/titan#nombres`) : tous les chiffres de p, q et n, page par page, avec téléchargement. Le navigateur peut recalculer chaque nombre et comparer son empreinte SHA-256 avec le fichier publié. Une démo du test de Lucas-Lehmer est incluse.
 - **Apprendre** (`/learn`) : RSA expliqué pas à pas.
 
 Les fichiers `public/primes/*.txt` sont générés par `node scripts/gen-primes.mjs`.

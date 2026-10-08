@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Alert, Button, Label, Panel, downloadText, inputClass } from "@/components/ui";
-import { LucasLehmer, PrimeViewer, type Verified, type Which } from "./PrimeViewer";
+import { PrimesClient } from "./PrimesClient";
 
 // Onglet actif dans l'URL (#nombres) : lien direct possible vers les nombres premiers
 const subscribeHash = (cb: () => void) => {
@@ -54,10 +54,6 @@ export function TitanClient() {
   const [benching, setBenching] = useState(false);
   const [attack, setAttack] = useState<{ ok: boolean; a: number; b: number; ms: number } | null>(null);
   const [error, setError] = useState("");
-  const [verified, setVerified] = useState<Partial<Record<Which, Verified>>>({});
-  const [verifying, setVerifying] = useState<Which | null>(null);
-  const [lucas, setLucas] = useState<{ k: number; prime: boolean; ms: number } | null>(null);
-  const [lucasRunning, setLucasRunning] = useState(false);
   const tab = useHash() === "#nombres" ? "nombres" : "defi";
 
   useEffect(() => {
@@ -87,17 +83,7 @@ export function TitanClient() {
         case "hex":
           downloadText("titan-n.hex.txt", m.hex);
           break;
-        case "verified":
-          setVerified((prev) => ({ ...prev, [m.which]: m }));
-          setVerifying(null);
-          break;
-        case "lucas":
-          setLucas(m);
-          setLucasRunning(false);
-          break;
         case "error":
-          setVerifying(null);
-          setLucasRunning(false);
           setError(m.message);
           setBuilding(false);
           setBenching(false);
@@ -145,27 +131,8 @@ export function TitanClient() {
         ))}
       </div>
 
-      <div hidden={tab !== "nombres"} className="space-y-6">
-        <Panel title="titan/nombres.txt">
-          <PrimeViewer
-            verified={verified}
-            verifying={verifying}
-            onVerify={(w) => {
-              setVerifying(w);
-              send({ type: "verify", which: w });
-            }}
-          />
-        </Panel>
-        <Panel title="titan/lucas-lehmer.sh">
-          <LucasLehmer
-            result={lucas}
-            running={lucasRunning}
-            onRun={(k) => {
-              setLucasRunning(true);
-              send({ type: "lucas", k });
-            }}
-          />
-        </Panel>
+      <div hidden={tab !== "nombres"}>
+        {tab === "nombres" && <PrimesClient />}
       </div>
 
       <div hidden={tab !== "defi"} className="space-y-6">

@@ -83,46 +83,54 @@ describe("comptes", () => {
   });
 });
 
-describe("messages chiffrés", () => {
-  it("Awa écrit à Moussa, chacun relit avec SA clé privée", async () => {
+describe("réseau public de messages chiffrés", () => {
+  it("Awa diffuse un message pour Moussa : seul Moussa peut le déchiffrer", async () => {
     const text = "RDV 18h à la BU 🔐";
     await svc.sendMessage(d, awa.id, "moussa", await envFor(text, moussa.pub), await envFor(text, awa.pub));
 
-    const forMoussa = await svc.listMessages(d, moussa.id, "awa", 0);
-    expect(forMoussa).toHaveLength(1);
-    expect(forMoussa[0].fromMe).toBe(false);
-    expect(getScheme("RSA").decrypt(forMoussa[0].env, moussa.priv).text).toBe(text);
-    // La clé d'Awa ne peut pas ouvrir l'exemplaire de Moussa
-    expect(() => getScheme("RSA").decrypt(forMoussa[0].env, awa.priv)).toThrow();
-
-    const forAwa = await svc.listMessages(d, awa.id, "moussa", 0);
-    expect(forAwa[0].fromMe).toBe(true);
-    expect(getScheme("RSA").decrypt(forAwa[0].env, awa.priv).text).toBe(text);
+    const [m] = await svc.network(d, moussa.id, 0);
+    expect(m).toMatchObject({ from: "awa", to: "moussa" });
+    expect(getScheme("RSA").decrypt(m.env, moussa.priv).text).toBe(text);
+    // Le destinataire ne reçoit pas la copie de l'expéditeur
+    expect(m.senderEnv).toBeUndefined();
   });
 
-  it("réponse + pagination par id + liste des conversations", async () => {
-    const [first] = await svc.listMessages(d, moussa.id, "awa", 0);
-    await svc.sendMessage(d, moussa.id, "awa", await envFor("Ok !", awa.pub), await envFor("Ok !", moussa.pub));
-    const newer = await svc.listMessages(d, awa.id, "moussa", first.id);
-    expect(newer).toHaveLength(1);
-    expect(getScheme("RSA").decrypt(newer[0].env, awa.priv).text).toBe("Ok !");
+  it("un tiers voit le message dans le réseau mais sa clé privée ne l'ouvre pas", async () => {
+    const eve = await makeUser("eve");
+    const [m] = await svc.network(d, eve.id, 0);
+    expect(m).toMatchObject({ from: "awa", to: "moussa" });
+    expect(m.senderEnv).toBeUndefined();
+    expect(() => getScheme("RSA").decrypt(m.env, eve.priv)).toThrow();
+  });
 
-    const convs = await svc.conversations(d, awa.id);
-    expect(convs).toHaveLength(1);
-    expect(convs[0]).toMatchObject({ username: "moussa", lastFromMe: false });
+  it("l'expéditeur relit sa propre copie, chiffrée avec SA clé publique", async () => {
+    const [m] = await svc.network(d, awa.id, 0);
+    expect(m.senderEnv).toBeDefined();
+    expect(getScheme("RSA").decrypt(m.senderEnv!, awa.priv).text).toBe("RDV 18h à la BU 🔐");
+    expect(() => getScheme("RSA").decrypt(m.env, awa.priv)).toThrow();
+  });
+
+  it("pagination : seuls les nouveaux messages après un id", async () => {
+    const [first] = await svc.network(d, awa.id, 0);
+    await svc.sendMessage(d, moussa.id, "awa", await envFor("Ok !", awa.pub), await envFor("Ok !", moussa.pub));
+    const newer = await svc.network(d, awa.id, first.id);
+    expect(newer).toHaveLength(1);
+    expect(newer[0]).toMatchObject({ from: "moussa", to: "awa" });
+    expect(getScheme("RSA").decrypt(newer[0].env, awa.priv).text).toBe("Ok !");
+  });
+
+  it("annuaire : toutes les clés publiques, sans aucune donnée secrète", async () => {
+    const dir = await svc.directory(d);
+    expect(dir.map((u) => u.username)).toEqual(expect.arrayContaining(["awa", "moussa", "eve"]));
+    const a = dir.find((u) => u.username === "awa")!;
+    expect(a.publicKey).toEqual(awa.pub);
+    expect(Object.keys(a).sort()).toEqual(["fingerprint", "publicKey", "publishedAt", "username"]);
   });
 
   it("refuse un message chiffré avec une autre clé que celle du destinataire", async () => {
     await expect(
       svc.sendMessage(d, awa.id, "moussa", await envFor("x", awa.pub), await envFor("x", awa.pub)),
     ).rejects.toThrow(/clé publique actuelle/);
-  });
-
-  it("un tiers ne voit pas la conversation", async () => {
-    const eve = await makeUser("eve");
-    expect(await svc.conversations(d, eve.id)).toHaveLength(0);
-    const leak = await svc.listMessages(d, eve.id, "awa", 0);
-    expect(leak).toHaveLength(0);
   });
 });
 

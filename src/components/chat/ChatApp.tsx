@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import { api, HttpError, loadUnlocked, storeUnlocked, type Account, type MeResponse } from "@/lib/client/account";
 import { AuthScreen, UnlockScreen } from "./AuthScreens";
-import { ChatShell } from "./ChatShell";
+import { NetworkShell } from "@/components/network/NetworkShell";
 
 type State =
   | { status: "loading" }
   | { status: "anon" }
   | { status: "locked"; me: MeResponse }
-  | { status: "ready"; account: Account }
+  | { status: "ready"; account: Account; fresh: boolean }
   | { status: "error"; message: string };
 
 export function ChatApp() {
@@ -19,7 +19,7 @@ export function ChatApp() {
     api<MeResponse>("/api/me")
       .then((me) => {
         const unlocked = loadUnlocked(me.username);
-        setState(unlocked ? { status: "ready", account: unlocked } : { status: "locked", me });
+        setState(unlocked ? { status: "ready", account: unlocked, fresh: false } : { status: "locked", me });
       })
       .catch((err) => {
         if (err instanceof HttpError && err.status === 401) setState({ status: "anon" });
@@ -33,7 +33,7 @@ export function ChatApp() {
     setState({ status: "anon" });
   };
 
-  const ready = (account: Account) => setState({ status: "ready", account });
+  const ready = (account: Account, fresh = false) => setState({ status: "ready", account, fresh });
 
   switch (state.status) {
     case "loading":
@@ -45,6 +45,6 @@ export function ChatApp() {
     case "locked":
       return <UnlockScreen me={state.me} onReady={ready} onLogout={logout} />;
     case "ready":
-      return <ChatShell account={state.account} onLogout={logout} />;
+      return <NetworkShell account={state.account} fresh={state.fresh} onLogout={logout} />;
   }
 }

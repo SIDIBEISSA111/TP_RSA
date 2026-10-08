@@ -111,52 +111,12 @@ export async function findUser(d: Db, rawUsername: unknown): Promise<PublicUser 
   return { id: rows[0].id, ...toPublic(rows[0]) };
 }
 
-export async function searchUsers(d: Db, uid: number, q: string): Promise<PublicUser[]> {
-  const prefix = q.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, "");
-  if (!prefix) return [];
-  const rows = await d.query<UserRow>(
-    `SELECT * FROM users WHERE username LIKE $1 AND id <> $2 ORDER BY username LIMIT 8`,
-    [prefix + "%", uid],
+/** Annuaire public : la clé publique de chaque utilisateur, visible par tous. */
+export async function directory(d: Db): Promise<(PublicUser & { publishedAt: string })[]> {
+  const rows = await d.query<UserRow & { created_at: Date }>(
+    `SELECT username, fingerprint, public_key, created_at FROM users ORDER BY id DESC LIMIT 500`,
   );
-  return rows.map(toPublic);
-}
-
-export interface Conversation {
-  username: string;
-  fingerprint: string;
-  lastId: number;
-  lastAt: string;
-  lastFromMe: boolean;
-}
-
-export async function conversations(d: Db, uid: number): Promise<Conversation[]> {
-  const rows = await d.query<{ username: string; fingerprint: string; last_id: number; last_at: Date; sender_id: number }>(
-    `SELECT u.username, u.fingerprint, c.last_id, lm.created_at AS last_at, lm.sender_id
-     FROM (
-       SELECT CASE WHEN sender_id = $1 THEN recipient_id ELSE sender_id END AS partner, MAX(id) AS last_id
-       FROM messages WHERE sender_id = $1 OR recipient_id = $1
-       GROUP BY 1
-     ) c
-     JOIN users u ON u.id = c.partner
-     JOIN messages lm ON lm.id = c.last_id
-     ORDER BY c.last_id DESC
-     LIMIT 50`,
-    [uid],
-  );
-  return rows.map((r) => ({
-    username: r.username,
-    fingerprint: r.fingerprint,
-    lastId: r.last_id,
-    lastAt: new Date(r.last_at).toISOString(),
-    lastFromMe: r.sender_id === uid,
-  }));
-}
-
-export interface StoredMessage {
-  id: number;
-  fromMe: boolean;
-  createdAt: string;
-  env: Envelope;
+  return rows.map((u) => ({ ...toPublic(u), publishedAt: new Date(u.created_at).toISOString() }));
 }
 
 interface Envelope {
@@ -167,20 +127,47 @@ interface Envelope {
   blocks: string[];
 }
 
-export async function listMessages(d: Db, uid: number, partnerName: unknown, after: number): Promise<StoredMessage[]> {
-  const partner = await findUser(d, partnerName);
+export interface NetworkMessage {
+  id: number;
+  from: string;
+  to: string;
+  createdAt: string;
+  /** Chiffré avec la clé publique du destinataire : tout le monde le voit, seul le destinataire peut l'ouvrir */
+  env: Envelope;
+  /** Copie chiffrée avec la clé publique de l'expéditeur : renvoyée uniquement à l'expéditeur */
+  senderEnv?: Envelope;
+}
+
+/** Le réseau : TOUS les messages chiffrés, diffusés à tous les utilisateurs connectés. */
+export async function network(d: Db, uid: number, after: number): Promise<NetworkMessage[]> {
   const initial = !after;
-  const rows = await d.query<{ id: number; sender_id: number; created_at: Date; env: Envelope }>(
-    `SELECT id, sender_id, created_at,
-            CASE WHEN sender_id = $1 THEN env_sender ELSE env_recipient END AS env
-     FROM messages
-     WHERE ((sender_id = $1 AND recipient_id = $2) OR (sender_id = $2 AND recipient_id = $1)) AND id > $3
-     ORDER BY id ${initial ? "DESC" : "ASC"}
-     LIMIT ${initial ? 100 : 200}`,
-    [uid, partner.id, after || 0],
+  const rows = await d.query<{
+    id: number;
+    sender_id: number;
+    sender: string;
+    recipient: string;
+    created_at: Date;
+    env_recipient: Envelope;
+    env_sender: Envelope;
+  }>(
+    `SELECT m.id, m.sender_id, s.username AS sender, r.username AS recipient, m.created_at, m.env_recipient, m.env_sender
+     FROM messages m
+     JOIN users s ON s.id = m.sender_id
+     JOIN users r ON r.id = m.recipient_id
+     WHERE m.id > $1
+     ORDER BY m.id ${initial ? "DESC" : "ASC"}
+     LIMIT 200`,
+    [after || 0],
   );
   if (initial) rows.reverse();
-  return rows.map((r) => ({ id: r.id, fromMe: r.sender_id === uid, createdAt: new Date(r.created_at).toISOString(), env: r.env }));
+  return rows.map((r) => ({
+    id: r.id,
+    from: r.sender,
+    to: r.recipient,
+    createdAt: new Date(r.created_at).toISOString(),
+    env: r.env_recipient,
+    ...(r.sender_id === uid ? { senderEnv: r.env_sender } : {}),
+  }));
 }
 
 function checkEnvelope(v: unknown, expectedKid: string, who: string): Envelope {
